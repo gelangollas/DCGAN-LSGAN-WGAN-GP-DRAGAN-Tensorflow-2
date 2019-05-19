@@ -83,7 +83,7 @@ def make_anime_dataset(img_paths, batch_size, resize=64, drop_remainder=True, sh
 # =                               custom dataset                               =
 # ==============================================================================
 
-def make_custom_datset(img_paths, batch_size, resize=64, drop_remainder=True, shuffle=True, repeat=1):
+def make_custom_dataset(img_paths, batch_size, resize=64, drop_remainder=True, shuffle=True, repeat=1):
     @tf.function
     def _map_fn(img):
         # ======================================
