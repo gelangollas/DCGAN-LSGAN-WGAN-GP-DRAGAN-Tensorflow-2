@@ -177,7 +177,7 @@ with train_summary_writer.as_default():
         ep_cnt.assign_add(1)
 
         # train for an epoch
-        for x_real, _ in dataset, tqdm.trange(len_dataset):
+        for x_real, _ in zip(dataset, tqdm.trange(len_dataset)):
             D_loss_dict = train_D(x_real)
             tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
 
