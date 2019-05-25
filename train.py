@@ -199,11 +199,11 @@ with train_summary_writer.as_default():
 
         x_fake = sample(z)
         img = im.immerge(x_fake, n_rows=10).squeeze()
-        im.imwrite(img, py.join(sample_dir, '1', 'iter-%09d.jpg' % ep))
+        im.imwrite(img, py.join(sample_dir, '1', 'iter-%4d.jpg' % ep))
 
         x_fake = sample(z2)
         img = im.immerge(x_fake, n_rows=10).squeeze()
-        im.imwrite(img, py.join(sample_dir, '2', 'iter-%09d.jpg' % ep))
+        im.imwrite(img, py.join(sample_dir, '2', 'iter-%4d.jpg' % ep))
 
 
 
