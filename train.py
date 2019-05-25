@@ -192,10 +192,10 @@ with train_summary_writer.as_default():
                 it_G += 1
 
         with open(path.join(summary_dir, 'g_loss.txt'), 'w+') as file:
-            file.write(str(sum_loss_G/it_G))
+            file.write(str(sum_loss_G/it_G)+'\n')
 
         with open(path.join(summary_dir, 'd_loss.txt'), 'w+') as file:
-            file.write(str(sum_loss_D/it_D))
+            file.write(str(sum_loss_D/it_D)+'\n')
 
         x_fake = sample(z)
         img = im.immerge(x_fake, n_rows=10).squeeze()
