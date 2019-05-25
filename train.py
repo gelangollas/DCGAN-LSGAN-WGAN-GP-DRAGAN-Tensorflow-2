@@ -169,7 +169,6 @@ py.mkdir(sample_dir)
 z = tf.random.normal((100, 1, 1, args.z_dim))  # a fixed noise for sampling
 z2 = tf.random.normal((100, 1, 1, args.z_dim))  # a fixed noise for sampling
 with train_summary_writer.as_default():
-    shape_ds = len(dataset)
     for ep in tqdm.trange(args.epochs, desc='Epoch Loop'):
         if ep < ep_cnt:
             continue
