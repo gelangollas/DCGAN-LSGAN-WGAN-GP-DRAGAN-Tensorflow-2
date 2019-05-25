@@ -1,4 +1,5 @@
 import functools
+from os import path
 
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -163,6 +164,7 @@ train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summar
 
 # sample
 sample_dir = py.join(output_dir, 'samples_training')
+summary_dir = path.join(output_dir, 'samples_training', 'summaries')
 py.mkdir(sample_dir)
 
 # main loop
@@ -189,10 +191,10 @@ with train_summary_writer.as_default():
                 sum_loss_G = G_loss_dict['g_loss']
                 it_G += 1
 
-        with open(py.join(sample_dir, 'summaries', 'g_loss.txt'), 'w+') as file:
+        with open(path.join(summary_dir, 'g_loss.txt'), 'w+') as file:
             file.write(sum_loss_G/it_G)
 
-        with open(py.join(sample_dir, 'summaries', 'd_loss.txt'), 'w+') as file:
+        with open(path.join(summary_dir, 'd_loss.txt'), 'w+') as file:
             file.write(sum_loss_D/it_D)
 
         x_fake = sample(z)
