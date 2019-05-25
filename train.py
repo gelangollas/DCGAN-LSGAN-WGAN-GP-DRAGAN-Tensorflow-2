@@ -1,17 +1,15 @@
 import functools
 
-import imlib as im
-import pylib as py
 import tensorflow as tf
 import tensorflow.keras as keras
-import tf2lib as tl
-import tf2gan as gan
 import tqdm
-from tqdm import tqdm_notebook
 
 import data
+import imlib as im
 import module
-
+import pylib as py
+import tf2gan as gan
+import tf2lib as tl
 
 # ==============================================================================
 # =                                   param                                    =
@@ -116,6 +114,7 @@ def train_G():
 
 @tf.function
 def train_D(x_real):
+    global D_loss
     with tf.GradientTape() as t:
         z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
         x_fake = G(z, training=True)
@@ -131,7 +130,7 @@ def train_D(x_real):
     D_grad = t.gradient(D_loss, D.trainable_variables)
     D_optimizer.apply_gradients(zip(D_grad, D.trainable_variables))
 
-    return {'d_loss': x_real_d_loss + x_fake_d_loss, 'gp': gp}
+    return {'d_loss': x_real_d_loss + x_fake_d_loss, 'gp': gp, 'D_loss': D_loss}
 
 
 @tf.function
@@ -153,7 +152,7 @@ checkpoint = tl.Checkpoint(dict(G=G,
                                 D_optimizer=D_optimizer,
                                 ep_cnt=ep_cnt),
                            py.join(output_dir, 'checkpoints'),
-                           max_to_keep=5)
+                           max_to_keep=10)
 try:  # restore checkpoint including the epoch counter
     checkpoint.restore().assert_existing_objects_matched()
 except Exception as e:
@@ -168,7 +167,9 @@ py.mkdir(sample_dir)
 
 # main loop
 z = tf.random.normal((100, 1, 1, args.z_dim))  # a fixed noise for sampling
+z2 = tf.random.normal((100, 1, 1, args.z_dim))  # a fixed noise for sampling
 with train_summary_writer.as_default():
+    shape_ds = len(dataset)
     for ep in tqdm.trange(args.epochs, desc='Epoch Loop'):
         if ep < ep_cnt:
             continue
@@ -176,20 +177,34 @@ with train_summary_writer.as_default():
         # update epoch counter
         ep_cnt.assign_add(1)
 
+        sum_loss_D, it_D = 0, 0
+        sum_loss_G, it_G = 0, 0
         # train for an epoch
         for x_real in dataset:
             D_loss_dict = train_D(x_real)
-            tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
+            sum_loss_D += D_loss_dict['D_loss']
+            it_D += 1
 
             if D_optimizer.iterations.numpy() % args.n_d == 0:
                 G_loss_dict = train_G()
-                tl.summary(G_loss_dict, step=G_optimizer.iterations, name='G_losses')
+                sum_loss_G = G_loss_dict['g_loss']
+                it_G += 1
 
-            # sample
-            if G_optimizer.iterations.numpy() % 100 == 0:
-                x_fake = sample(z)
-                img = im.immerge(x_fake, n_rows=10).squeeze()
-                im.imwrite(img, py.join(sample_dir, 'iter-%09d.jpg' % G_optimizer.iterations.numpy()))
+        with open(py.join(sample_dir, 'summaries', 'g_loss.txt'), 'w+') as file:
+            file.write(sum_loss_G/it_G)
+
+        with open(py.join(sample_dir, 'summaries', 'd_loss.txt'), 'w+') as file:
+            file.write(sum_loss_D/it_D)
+
+        x_fake = sample(z)
+        img = im.immerge(x_fake, n_rows=10).squeeze()
+        im.imwrite(img, py.join(sample_dir, '1', 'iter-%09d.jpg' % ep))
+
+        x_fake = sample(z2)
+        img = im.immerge(x_fake, n_rows=10).squeeze()
+        im.imwrite(img, py.join(sample_dir, '2', 'iter-%09d.jpg' % ep))
+
+
 
         # save checkpoint
         checkpoint.save(ep)
