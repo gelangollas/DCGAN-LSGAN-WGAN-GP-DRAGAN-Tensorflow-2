@@ -182,12 +182,12 @@ with train_summary_writer.as_default():
         # train for an epoch
         for x_real in dataset:
             D_loss_dict = train_D(x_real)
-            sum_loss_D += D_loss_dict['D_loss']
+            sum_loss_D += float(D_loss_dict['D_loss'])
             it_D += 1
 
             if D_optimizer.iterations.numpy() % args.n_d == 0:
                 G_loss_dict = train_G()
-                sum_loss_G = G_loss_dict['g_loss']
+                sum_loss_G = float(G_loss_dict['g_loss'])
                 it_G += 1
 
         with open(path.join(summary_dir, 'g_loss.txt'), 'w+') as file:
