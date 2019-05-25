@@ -191,10 +191,10 @@ with train_summary_writer.as_default():
                 sum_loss_G = float(G_loss_dict['g_loss'])
                 it_G += 1
 
-        with open(path.join(summary_dir, 'g_loss.txt'), 'w+') as file:
+        with open(path.join(summary_dir, 'g_loss.txt'), 'a+') as file:
             file.write(str(sum_loss_G/it_G)+'\n')
 
-        with open(path.join(summary_dir, 'd_loss.txt'), 'w+') as file:
+        with open(path.join(summary_dir, 'd_loss.txt'), 'a+') as file:
             file.write(str(sum_loss_D/it_D)+'\n')
 
         x_fake = sample(z)
