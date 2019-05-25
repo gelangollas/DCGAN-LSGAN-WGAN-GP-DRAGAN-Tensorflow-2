@@ -163,7 +163,7 @@ train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summar
 
 # sample
 sample_dir = py.join(output_dir, 'samples_training')
-summary_dir = path.join(output_dir, 'samples_training', 'summaries')
+summary_dir = path.join(output_dir, 'summaries')
 py.mkdir(sample_dir)
 
 # main loop
