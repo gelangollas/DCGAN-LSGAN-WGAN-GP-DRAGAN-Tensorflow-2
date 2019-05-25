@@ -115,7 +115,6 @@ def train_G():
 
 @tf.function
 def train_D(x_real):
-    global D_loss
     with tf.GradientTape() as t:
         z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
         x_fake = G(z, training=True)
