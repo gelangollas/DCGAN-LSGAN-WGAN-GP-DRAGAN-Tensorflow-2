@@ -164,7 +164,8 @@ train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summar
 # sample
 sample_dir = py.join(output_dir, 'samples_training')
 summary_dir = path.join(output_dir, 'summaries')
-py.mkdir(sample_dir)
+py.mkdir(py.join(sample_dir, '1'))
+py.mkdir(py.join(sample_dir, '2'))
 
 # main loop
 z = tf.random.normal((100, 1, 1, args.z_dim))  # a fixed noise for sampling
