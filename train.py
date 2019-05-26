@@ -110,29 +110,34 @@ D_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1)
 # =                                 train step                                 =
 # ==============================================================================
 
-def make_G_input_labels_batch(labels=None):
+def make_G_input_labels_batch(num_labels=None):
     batch_size = args.batch_size
-    if labels is None:
-        labels = [randint(0, n_classes) for _ in range(batch_size)]
+    if num_labels is None:
+        num_labels = [randint(0, n_classes) for _ in range(batch_size)]
     G_labels_batch = np.zeros((batch_size, 1, 1, n_classes))
     for i in range(batch_size):
-        G_labels_batch[i][0][0][labels[i]] = 1
+        G_labels_batch[i][0][0][num_labels[i]] = 1
     return G_labels_batch
 
 
-def encode_D_label_into_image_batch(images, labels):
+def encode_D_label_into_image_batch(images, num_labels):
     batch_size = args.batch_size
+    encoded = np.array(images)
     for i in range(batch_size):
-        pass
-
+        for j in range(encoded[i].shape[1]):
+            encoded[i][0][j][0] = 0
+        encoded[i][0][num_labels[i]][0] = 1
+    return encoded
 
 @tf.function
 def train_G():
     with tf.GradientTape() as t:
         z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
-        class_input = make_G_input_labels_batch()
+        fake_labels = [randint(0, n_classes) for _ in range(args.batch_size)]
+        class_input = make_G_input_labels_batch(fake_labels)
         x_fake = G(class_input, z, training=True)
-        x_fake_d_logit = D(x_fake, training=True)
+        x_fake_encoded = encode_D_label_into_image_batch(x_fake, fake_labels)
+        x_fake_d_logit = D(x_fake_encoded, training=True)
         G_loss = g_loss_fn(x_fake_d_logit)
 
     G_grad = t.gradient(G_loss, G.trainable_variables)
@@ -142,17 +147,19 @@ def train_G():
 
 
 @tf.function
-def train_D(x_real):
+def train_D(x_real, real_labels):
     with tf.GradientTape() as t:
         z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
-        class_input = make_G_input_labels_batch()
-        x_fake = G(class_input, z, training=True)
-
-        x_real_d_logit = D(x_real, training=True)
-        x_fake_d_logit = D(x_fake, training=True)
+        fake_labels = [randint(0, n_classes) for _ in range(args.batch_size)]
+        class_fake_input = make_G_input_labels_batch(fake_labels)
+        x_fake = G(class_fake_input, z, training=True)
+        x_fake_encoded = encode_D_label_into_image_batch(x_fake, fake_labels)
+        x_real_encoded = encode_D_label_into_image_batch(x_real, real_labels)
+        x_real_d_logit = D(x_real_encoded, training=True)
+        x_fake_d_logit = D(x_fake_encoded, training=True)
 
         x_real_d_loss, x_fake_d_loss = d_loss_fn(x_real_d_logit, x_fake_d_logit)
-        gp = gan.gradient_penalty(functools.partial(D, training=True), x_real, x_fake, mode=args.gradient_penalty_mode)
+        gp = gan.gradient_penalty(functools.partial(D, training=True), x_real_encoded, x_fake_encoded, mode=args.gradient_penalty_mode)
 
         D_loss = (x_real_d_loss + x_fake_d_loss) + gp * args.gradient_penalty_weight
 
@@ -220,8 +227,8 @@ with train_summary_writer.as_default():
         sum_loss_D, it_D = 0, 0
         sum_loss_G, it_G = 0, 0
         # train for an epoch
-        for x_real in dataset:
-            D_loss_dict = train_D(x_real)
+        for x_real, labels_real in zip(dataset, labels):
+            D_loss_dict = train_D(x_real, labels_real)
             sum_loss_D += float(D_loss_dict['D_loss'])
             it_D += 1
 
@@ -236,11 +243,11 @@ with train_summary_writer.as_default():
         with open(path.join(summary_dir, 'd_loss.txt'), 'a+') as file:
             file.write(str(sum_loss_D/it_D)+'\n')
 
-        x_fake = sample(z)
+        x_fake = sample(class_inputs, z)
         img = im.immerge(x_fake, n_rows=10).squeeze()
         im.imwrite(img, py.join(sample_dir, '1', 'iter-%4d.jpg' % ep))
 
-        x_fake = sample(z2)
+        x_fake = sample(class_inputs2, z2)
         img = im.immerge(x_fake, n_rows=10).squeeze()
         im.imwrite(img, py.join(sample_dir, '2', 'iter-%4d.jpg' % ep))
 
