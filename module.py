@@ -44,8 +44,6 @@ def ConvGenerator(input_shape=(1, 1, 128),
     h = keras.layers.Conv2DTranspose(output_channels, 4, strides=2, padding='same', use_bias=False)(h)
     h = keras.layers.Activation('tanh')(h)
     
-    from keras.utils import plot_model
-    plot_model(model, to_file='model_gen.png')
     return keras.Model(inputs=inputs, outputs=h, name=name)
 
 
@@ -71,6 +69,5 @@ def ConvDiscriminator(input_shape=(64, 64, 3),
 
     # 3: logit
     h = keras.layers.Conv2D(1, 4, strides=1, padding='valid')(h)
-    from keras.utils import plot_model
-    plot_model(model, to_file='model_dis.png')
+
     return keras.Model(inputs=inputs, outputs=h, name=name)
