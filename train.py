@@ -9,8 +9,10 @@ import data
 import imlib as im
 import module
 import pylib as py
+import numpy as np
 import tf2gan as gan
 import tf2lib as tl
+from random import randint
 
 # ==============================================================================
 # =                                   param                                    =
@@ -28,6 +30,7 @@ py.arg('--adversarial_loss_mode', default='gan', choices=['gan', 'hinge_v1', 'hi
 py.arg('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wgan-gp'])
 py.arg('--gradient_penalty_weight', type=float, default=10.0)
 py.arg('--experiment_name', default='none')
+py.arg('--conditional', default=False, type=bool)
 args = py.args()
 
 # output_dir
@@ -48,8 +51,9 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
 # setup dataset
 if args.dataset in ['cifar10', 'fashion_mnist', 'mnist']:  # 32x32
-    dataset, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size)
+    dataset, labels, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size)
     n_G_upsamplings = n_D_downsamplings = 3
+    n_classes = 10
 
 elif args.dataset == 'celeba':  # 64x64
     img_paths = py.glob('data/img_align_celeba', '*.jpg')
@@ -83,8 +87,15 @@ if args.gradient_penalty_mode in ['dragan', 'wgan-gp']:  # cannot use batch norm
     d_norm = 'layer_norm'
 
 # networks
-G = module.ConvGenerator(input_shape=(1, 1, args.z_dim), output_channels=shape[-1], n_upsamplings=n_G_upsamplings, name='G_%s' % args.dataset)
-D = module.ConvDiscriminator(input_shape=shape, n_downsamplings=n_D_downsamplings, norm=d_norm, name='D_%s' % args.dataset)
+G = module.ConvGenerator(input_shape=(1, 1, args.z_dim),
+                         class_input_shape=(1, 1, n_classes),
+                         output_channels=shape[-1],
+                         n_upsamplings=n_G_upsamplings,
+                         name='G_%s' % args.dataset)
+D = module.ConvDiscriminator(input_shape=shape,
+                             n_downsamplings=n_D_downsamplings,
+                             norm=d_norm,
+                             name='D_%s' % args.dataset)
 G.summary()
 D.summary()
 
@@ -99,11 +110,28 @@ D_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1)
 # =                                 train step                                 =
 # ==============================================================================
 
+def make_G_input_labels_batch(labels=None):
+    batch_size = args.batch_size
+    if labels is None:
+        labels = [randint(0, n_classes) for _ in range(batch_size)]
+    G_labels_batch = np.zeros((batch_size, 1, 1, n_classes))
+    for i in range(batch_size):
+        G_labels_batch[i][0][0][labels[i]] = 1
+    return G_labels_batch
+
+
+def encode_D_label_into_image_batch(images, labels):
+    batch_size = args.batch_size
+    for i in range(batch_size):
+        pass
+
+
 @tf.function
 def train_G():
     with tf.GradientTape() as t:
         z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
-        x_fake = G(z, training=True)
+        class_input = make_G_input_labels_batch()
+        x_fake = G(class_input, z, training=True)
         x_fake_d_logit = D(x_fake, training=True)
         G_loss = g_loss_fn(x_fake_d_logit)
 
@@ -117,7 +145,8 @@ def train_G():
 def train_D(x_real):
     with tf.GradientTape() as t:
         z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
-        x_fake = G(z, training=True)
+        class_input = make_G_input_labels_batch()
+        x_fake = G(class_input, z, training=True)
 
         x_real_d_logit = D(x_real, training=True)
         x_fake_d_logit = D(x_fake, training=True)
@@ -134,8 +163,8 @@ def train_D(x_real):
 
 
 @tf.function
-def sample(z):
-    return G(z, training=False)
+def sample(class_input, z):
+    return G(class_input, z, training=False)
 
 
 # ==============================================================================
@@ -168,8 +197,18 @@ py.mkdir(py.join(sample_dir, '1'))
 py.mkdir(py.join(sample_dir, '2'))
 
 # main loop
-z = tf.random.normal((100, 1, 1, args.z_dim))  # a fixed noise for sampling
-z2 = tf.random.normal((100, 1, 1, args.z_dim))  # a fixed noise for sampling
+z = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))  # a fixed noise for sampling
+class_inputs = np.zeros((n_classes*n_classes, 1, n_classes))
+for i in range(n_classes):
+    for j in range(n_classes):
+        class_inputs[i][0][j] = i
+
+z2 = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))  # a fixed noise for sampling
+class_inputs2 = np.zeros((n_classes*n_classes, 1, n_classes))
+for i in range(n_classes):
+    for j in range(n_classes):
+        class_inputs2[i][0][j] = i
+
 with train_summary_writer.as_default():
     for ep in tqdm.trange(args.epochs, desc='Epoch Loop'):
         if ep < ep_cnt:
