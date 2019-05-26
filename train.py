@@ -87,9 +87,6 @@ G = module.ConvGenerator(input_shape=(1, 1, args.z_dim), output_channels=shape[-
 D = module.ConvDiscriminator(input_shape=shape, n_downsamplings=n_D_downsamplings, norm=d_norm, name='D_%s' % args.dataset)
 G.summary()
 D.summary()
-from keras.utils import plot_model
-plot_model(G, to_file='model_gen.png')
-plot_model(D, to_file='model_dis.png')
 
 # adversarial_loss_functions
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
