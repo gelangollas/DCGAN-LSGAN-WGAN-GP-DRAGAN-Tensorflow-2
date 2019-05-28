@@ -197,8 +197,8 @@ py.mkdir(py.join(sample_dir, '2'))
 # main loop
 z = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))  # a fixed noise for sampling
 z2 = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))  # a fixed noise for sampling
-sample_labels = tf.convert_to_tensor(list(range(n_classes)), dtype=tf.float32)
-sample_labels_onehot = tf.one_hot(sample_labels, depth=n_classes)
+sample_labels = np.array(list(range(n_classes))*n_classes).reshape((n_classes*n_classes, 1, 1))
+sample_labels_onehot = tf.one_hot(sample_labels, depth=n_classes, dtype=tf.dtypes.float32)
 
 with train_summary_writer.as_default():
     for ep in tqdm.trange(args.epochs, desc='Epoch Loop'):
