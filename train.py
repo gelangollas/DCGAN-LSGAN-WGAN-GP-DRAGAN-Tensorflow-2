@@ -113,7 +113,7 @@ D_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1)
 def make_G_input_labels_batch(num_labels=None):
     batch_size = args.batch_size
     if num_labels is None:
-        num_labels = [randint(0, n_classes) for _ in range(batch_size)]
+        num_labels = [randint(0, n_classes-1) for _ in range(batch_size)]
     G_labels_batch = np.zeros((batch_size, 1, 1, n_classes))
     for i in range(batch_size):
         G_labels_batch[i][0][0][num_labels[i]] = 1
@@ -133,7 +133,7 @@ def encode_D_label_into_image_batch(images, num_labels):
 def train_G():
     with tf.GradientTape() as t:
         z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
-        fake_labels = [randint(0, n_classes) for _ in range(args.batch_size)]
+        fake_labels = [randint(0, n_classes-1) for _ in range(args.batch_size)]
         class_input = make_G_input_labels_batch(fake_labels)
         x_fake = G(class_input, z, training=True)
         x_fake_encoded = encode_D_label_into_image_batch(x_fake, fake_labels)
@@ -150,7 +150,7 @@ def train_G():
 def train_D(x_real, real_labels):
     with tf.GradientTape() as t:
         z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
-        fake_labels = [randint(0, n_classes) for _ in range(args.batch_size)]
+        fake_labels = [randint(0, n_classes-1) for _ in range(args.batch_size)]
         class_fake_input = make_G_input_labels_batch(fake_labels)
         x_fake = G(class_fake_input, z, training=True)
         x_fake_encoded = encode_D_label_into_image_batch(x_fake, fake_labels)
