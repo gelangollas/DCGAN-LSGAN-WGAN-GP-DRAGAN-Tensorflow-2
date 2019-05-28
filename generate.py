@@ -17,7 +17,7 @@ import tf2lib as tl
 # command line
 
 py.arg('--experiment_name', default='none')
-py.arg('--samples_per_class', default=100, type=int)
+py.arg('--samples_per_class', default=10000, type=int)
 args = py.args()
 output_folder = Path('output') / args.experiment_name
 train_args = py.load_yaml(Path(output_folder / 'settings.yml'))
@@ -105,4 +105,4 @@ with generate_summary_writer.as_default():
         x_fake = np.maximum(x_fake, -1*np.ones(x_fake.shape))
         x_fake = np.minimum(x_fake, np.ones(x_fake.shape))
         img = im.immerge(x_fake, n_rows=1).squeeze()
-        im.imwrite(img, py.join(results_folder, f'class_{i}_samples_{args.samples_per_class}.jpg'))
+        im.imwrite(img, py.join(results_folder, f'class_{i}.jpg'))
