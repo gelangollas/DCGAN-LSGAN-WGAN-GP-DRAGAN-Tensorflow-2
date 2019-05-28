@@ -1,6 +1,7 @@
 import functools
 from os import path
 
+import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 import tqdm
@@ -9,10 +10,8 @@ import data
 import imlib as im
 import module
 import pylib as py
-import numpy as np
 import tf2gan as gan
 import tf2lib as tl
-from random import randint
 
 # ==============================================================================
 # =                                   param                                    =
@@ -30,7 +29,6 @@ py.arg('--adversarial_loss_mode', default='gan', choices=['gan', 'hinge_v1', 'hi
 py.arg('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wgan-gp'])
 py.arg('--gradient_penalty_weight', type=float, default=10.0)
 py.arg('--experiment_name', default='none')
-py.arg('--conditional', default=False, type=bool)
 args = py.args()
 
 # output_dir
