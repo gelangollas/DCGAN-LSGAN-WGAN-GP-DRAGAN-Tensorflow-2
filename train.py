@@ -51,7 +51,8 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
 # setup dataset
 if args.dataset in ['cifar10', 'fashion_mnist', 'mnist']:  # 32x32
-    dataset, labels, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size)
+    dataset, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size)
+
     n_G_upsamplings = n_D_downsamplings = 3
     n_classes = 10
 
@@ -110,33 +111,26 @@ D_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1)
 # =                                 train step                                 =
 # ==============================================================================
 
-def make_G_input_labels_batch(num_labels=None):
-    batch_size = args.batch_size
-    if num_labels is None:
-        num_labels = [randint(0, n_classes-1) for _ in range(batch_size)]
-    G_labels_batch = np.zeros((batch_size, 1, 1, n_classes))
-    for i in range(batch_size):
-        G_labels_batch[i][0][0][num_labels[i]] = 1
-    return G_labels_batch
-
-
-def encode_D_label_into_image_batch(images, num_labels):
+@tf.function
+def encode_D_label_into_image_batch(images, numeric_labels):
     batch_size = args.batch_size
     encoded = np.array(images)
     for i in range(batch_size):
         for j in range(encoded[i].shape[1]):
             encoded[i][0][j][0] = 0
-        encoded[i][0][num_labels[i]][0] = 1
+        num = numeric_labels[i][0][0]
+        encoded[i][0][num][0] = 1
     return encoded
 
 @tf.function
 def train_G():
     with tf.GradientTape() as t:
         z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
-        fake_labels = [randint(0, n_classes-1) for _ in range(args.batch_size)]
-        class_input = make_G_input_labels_batch(fake_labels)
-        x_fake = G(class_input, z, training=True)
-        x_fake_encoded = encode_D_label_into_image_batch(x_fake, fake_labels)
+        random_labels = tf.random.uniform(shape=(args.batch_size, 1, 1, 1), maxval=n_classes, dtype=tf.dtypes.int64)
+        random_labels_onehot = tf.one_hot(random_labels, depth=n_classes)
+        x_fake = G(random_labels_onehot, z, training=True)
+
+        x_fake_encoded = encode_D_label_into_image_batch(x_fake, random_labels)
         x_fake_d_logit = D(x_fake_encoded, training=True)
         G_loss = g_loss_fn(x_fake_d_logit)
 
@@ -147,19 +141,20 @@ def train_G():
 
 
 @tf.function
-def train_D(x_real, real_labels):
+def train_D(x_real_with_label):
     with tf.GradientTape() as t:
         z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
-        fake_labels = [randint(0, n_classes-1) for _ in range(args.batch_size)]
-        class_fake_input = make_G_input_labels_batch(fake_labels)
-        x_fake = G(class_fake_input, z, training=True)
-        x_fake_encoded = encode_D_label_into_image_batch(x_fake, fake_labels)
-        x_real_encoded = encode_D_label_into_image_batch(x_real, real_labels)
-        x_real_d_logit = D(x_real_encoded, training=True)
-        x_fake_d_logit = D(x_fake_encoded, training=True)
+        random_labels = tf.random.uniform(shape=(args.batch_size, 1, 1, 1), maxval=n_classes, dtype=tf.dtypes.int64)
+        random_labels_onehot = tf.one_hot(random_labels, depth=n_classes)
+
+        x_fake = G(random_labels_onehot, z, training=True)
+        x_fake_with_label = encode_D_label_into_image_batch(x_fake, random_labels)
+
+        x_real_d_logit = D(x_real_with_label, training=True)
+        x_fake_d_logit = D(x_fake_with_label, training=True)
 
         x_real_d_loss, x_fake_d_loss = d_loss_fn(x_real_d_logit, x_fake_d_logit)
-        gp = gan.gradient_penalty(functools.partial(D, training=True), x_real_encoded, x_fake_encoded, mode=args.gradient_penalty_mode)
+        gp = gan.gradient_penalty(functools.partial(D, training=True), x_real_with_label, x_fake_with_label, mode=args.gradient_penalty_mode)
 
         D_loss = (x_real_d_loss + x_fake_d_loss) + gp * args.gradient_penalty_weight
 
@@ -205,16 +200,12 @@ py.mkdir(py.join(sample_dir, '2'))
 
 # main loop
 z = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))  # a fixed noise for sampling
-class_inputs = np.zeros((n_classes*n_classes, 1, n_classes))
-for i in range(n_classes):
-    for j in range(n_classes):
-        class_inputs[i][0][j] = i
+random_labels = tf.random.uniform(shape=(args.batch_size, 1, 1, 1), maxval=n_classes, dtype=tf.dtypes.int64)
+random_labels_onehot = tf.one_hot(random_labels, depth=n_classes)
 
 z2 = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))  # a fixed noise for sampling
-class_inputs2 = np.zeros((n_classes*n_classes, 1, n_classes))
-for i in range(n_classes):
-    for j in range(n_classes):
-        class_inputs2[i][0][j] = i
+random_labels2 = tf.random.uniform(shape=(args.batch_size, 1, 1, 1), maxval=n_classes, dtype=tf.dtypes.int64)
+random_labels_onehot2 = tf.one_hot(random_labels2, depth=n_classes)
 
 with train_summary_writer.as_default():
     for ep in tqdm.trange(args.epochs, desc='Epoch Loop'):
@@ -227,8 +218,8 @@ with train_summary_writer.as_default():
         sum_loss_D, it_D = 0, 0
         sum_loss_G, it_G = 0, 0
         # train for an epoch
-        for x_real, labels_real in zip(dataset, labels):
-            D_loss_dict = train_D(x_real, labels_real)
+        for x_real_with_label in dataset:
+            D_loss_dict = train_D(x_real_with_label)
             sum_loss_D += float(D_loss_dict['D_loss'])
             it_D += 1
 
@@ -243,15 +234,13 @@ with train_summary_writer.as_default():
         with open(path.join(summary_dir, 'd_loss.txt'), 'a+') as file:
             file.write(str(sum_loss_D/it_D)+'\n')
 
-        x_fake = sample(class_inputs, z)
+        x_fake = sample(random_labels_onehot, z)
         img = im.immerge(x_fake, n_rows=10).squeeze()
         im.imwrite(img, py.join(sample_dir, '1', 'iter-%4d.jpg' % ep))
 
-        x_fake = sample(class_inputs2, z2)
+        x_fake = sample(random_labels_onehot2, z2)
         img = im.immerge(x_fake, n_rows=10).squeeze()
         im.imwrite(img, py.join(sample_dir, '2', 'iter-%4d.jpg' % ep))
-
-
 
         # save checkpoint
         checkpoint.save(ep)
