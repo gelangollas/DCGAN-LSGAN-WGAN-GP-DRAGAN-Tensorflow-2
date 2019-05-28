@@ -17,8 +17,7 @@ def _get_norm_layer(norm):
         return tfa.layers.LayerNormalization
 
 
-def ConvGenerator(input_shape=(1, 1, 128),
-                  class_input_shape=(1, 1, 10),
+def ConvGenerator(input_shape=(1, 1, 128+10),
                   output_channels=3,
                   dim=64,
                   n_upsamplings=4,
@@ -26,11 +25,8 @@ def ConvGenerator(input_shape=(1, 1, 128),
                   name='ConvGenerator'):
     Norm = _get_norm_layer(norm)
 
-    class_input = keras.Input(shape=class_input_shape)
-    input = keras.Input(shape=input_shape)
-
     # 0
-    h = concatenate([class_input, input])
+    h = input = keras.Input(shape=input_shape)
 
     # 1: 1x1 -> 4x4
     d = min(dim * 2 ** (n_upsamplings - 1), dim * 8)
@@ -48,10 +44,10 @@ def ConvGenerator(input_shape=(1, 1, 128),
     h = keras.layers.Conv2DTranspose(output_channels, 4, strides=2, padding='same', use_bias=False)(h)
     h = keras.layers.Activation('tanh')(h)
 
-    return keras.Model(inputs=[class_input, input], outputs=h, name=name)
+    return keras.Model(inputs=input, outputs=h, name=name)
 
 
-def ConvDiscriminator(input_shape=(64, 64, 3),
+def ConvDiscriminator(input_shape=(64, 64, 3+10),
                       dim=64,
                       n_downsamplings=4,
                       norm='batch_norm',

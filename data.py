@@ -41,17 +41,6 @@ def make_32x32_dataset(dataset, batch_size, drop_remainder=True, shuffle=True, r
         train_labels = np.array(train_labels)
         del to_shuffle
 
-    def encode_label_into_image(image, label):
-        encoded = np.array(image)
-        for i in range(encoded.shape[1]):
-            encoded[0][i][0] = 0
-        encoded[0][label][0] = 1
-        return encoded
-
-    for i in range(train_images.shape[0]):
-        encoded = encode_label_into_image(train_images[i], train_labels[i])
-        train_images[i] = encoded
-
     dataset = tl.memory_data_batch_dataset(train_images,
                                            batch_size,
                                            drop_remainder=drop_remainder,
@@ -59,10 +48,12 @@ def make_32x32_dataset(dataset, batch_size, drop_remainder=True, shuffle=True, r
                                            shuffle=False,
                                            repeat=repeat)
 
+    labels = tf.data.Dataset.from_tensor_slices(train_labels).batch(batch_size, drop_remainder=True)
+
     img_shape = (32, 32, train_images.shape[-1])
     len_dataset = len(train_images) // batch_size
 
-    return dataset, img_shape, len_dataset
+    return dataset, labels, img_shape, len_dataset
 
 
 def make_celeba_dataset(img_paths, batch_size, resize=64, drop_remainder=True, shuffle=True, repeat=1):

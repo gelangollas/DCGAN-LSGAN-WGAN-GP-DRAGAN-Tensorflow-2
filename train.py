@@ -51,7 +51,7 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
 # setup dataset
 if args.dataset in ['cifar10', 'fashion_mnist', 'mnist']:  # 32x32
-    dataset, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size)
+    dataset, labels, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size)
 
     n_G_upsamplings = n_D_downsamplings = 3
     n_classes = 10
@@ -88,12 +88,13 @@ if args.gradient_penalty_mode in ['dragan', 'wgan-gp']:  # cannot use batch norm
     d_norm = 'layer_norm'
 
 # networks
-G = module.ConvGenerator(input_shape=(1, 1, args.z_dim),
-                         class_input_shape=(1, 1, n_classes),
+output_channels = shape[-1]
+batch_size = args.batch_size
+G = module.ConvGenerator(input_shape=(1, 1, args.z_dim+n_classes),
                          output_channels=shape[-1],
                          n_upsamplings=n_G_upsamplings,
                          name='G_%s' % args.dataset)
-D = module.ConvDiscriminator(input_shape=shape,
+D = module.ConvDiscriminator(input_shape=(shape[0], shape[1], shape[-1]+n_classes),
                              n_downsamplings=n_D_downsamplings,
                              norm=d_norm,
                              name='D_%s' % args.dataset)
@@ -112,26 +113,17 @@ D_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1)
 # ==============================================================================
 
 @tf.function
-def encode_D_label_into_image_batch(images, numeric_labels):
-    batch_size = args.batch_size
-    encoded = np.array(images)
-    for i in range(batch_size):
-        for j in range(encoded[i].shape[1]):
-            encoded[i][0][j][0] = 0
-        num = numeric_labels[i][0][0]
-        encoded[i][0][num][0] = 1
-    return encoded
-
-@tf.function
 def train_G():
     with tf.GradientTape() as t:
-        z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
-        random_labels = tf.random.uniform(shape=(args.batch_size, 1, 1, 1), maxval=n_classes, dtype=tf.dtypes.int64)
-        random_labels_onehot = tf.one_hot(random_labels, depth=n_classes)
-        x_fake = G(random_labels_onehot, z, training=True)
+        z = tf.random.normal(shape=(batch_size, 1, 1, args.z_dim))
+        random_labels = tf.random.uniform(shape=(batch_size, 1, 1), maxval=n_classes, dtype=tf.dtypes.int32)
+        random_labels_onehot = tf.one_hot(random_labels, depth=n_classes, dtype=tf.dtypes.float32)
+        x_fake = G(tf.concat([z, random_labels_onehot], axis=-1), training=True)
 
-        x_fake_encoded = encode_D_label_into_image_batch(x_fake, random_labels)
-        x_fake_d_logit = D(x_fake_encoded, training=True)
+        random_labels_fill = random_labels_onehot * tf.ones([batch_size, shape[0], shape[1], n_classes])
+        x_fake_with_label = tf.concat([x_fake, random_labels_fill], axis=-1)
+        x_fake_d_logit = D(x_fake_with_label, training=True)
+
         G_loss = g_loss_fn(x_fake_d_logit)
 
     G_grad = t.gradient(G_loss, G.trainable_variables)
@@ -141,15 +133,19 @@ def train_G():
 
 
 @tf.function
-def train_D(x_real_with_label):
+def train_D(x_real, label_real):
     with tf.GradientTape() as t:
-        z = tf.random.normal(shape=(args.batch_size, 1, 1, args.z_dim))
-        random_labels = tf.random.uniform(shape=(args.batch_size, 1, 1, 1), maxval=n_classes, dtype=tf.dtypes.int64)
-        random_labels_onehot = tf.one_hot(random_labels, depth=n_classes)
+        z = tf.random.normal(shape=(batch_size, 1, 1, args.z_dim))
+        random_labels = tf.random.uniform(shape=(batch_size, 1, 1), maxval=n_classes, dtype=tf.dtypes.int64)
+        random_labels_onehot = tf.one_hot(random_labels, depth=n_classes, dtype=tf.dtypes.float32)
 
-        x_fake = G(random_labels_onehot, z, training=True)
-        x_fake_with_label = encode_D_label_into_image_batch(x_fake, random_labels)
+        x_fake = G(tf.concat([z, random_labels_onehot], axis=-1), training=True)
+        random_labels_fill = random_labels_onehot * tf.ones([batch_size, shape[0], shape[1], n_classes])
+        x_fake_with_label = tf.concat([x_fake, random_labels_fill], axis=-1)
 
+        real_labels_onehot = tf.one_hot(tf.reshape(label_real, (batch_size, 1, 1)), depth=n_classes, dtype=tf.dtypes.float32)
+        real_labels_fill = real_labels_onehot * tf.ones([batch_size, shape[0], shape[1], n_classes])
+        x_real_with_label = tf.concat([x_real, real_labels_fill], axis=-1)
         x_real_d_logit = D(x_real_with_label, training=True)
         x_fake_d_logit = D(x_fake_with_label, training=True)
 
@@ -165,8 +161,8 @@ def train_D(x_real_with_label):
 
 
 @tf.function
-def sample(class_input, z):
-    return G(class_input, z, training=False)
+def sample(labels_onehot, z):
+    return G(tf.concat([z, labels_onehot], axis=-1), training=False)
 
 
 # ==============================================================================
@@ -200,12 +196,9 @@ py.mkdir(py.join(sample_dir, '2'))
 
 # main loop
 z = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))  # a fixed noise for sampling
-random_labels = tf.random.uniform(shape=(args.batch_size, 1, 1, 1), maxval=n_classes, dtype=tf.dtypes.int64)
-random_labels_onehot = tf.one_hot(random_labels, depth=n_classes)
-
 z2 = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))  # a fixed noise for sampling
-random_labels2 = tf.random.uniform(shape=(args.batch_size, 1, 1, 1), maxval=n_classes, dtype=tf.dtypes.int64)
-random_labels_onehot2 = tf.one_hot(random_labels2, depth=n_classes)
+sample_labels = tf.convert_to_tensor(list(range(n_classes)), dtype=tf.float32)
+sample_labels_onehot = tf.one_hot(sample_labels, depth=n_classes)
 
 with train_summary_writer.as_default():
     for ep in tqdm.trange(args.epochs, desc='Epoch Loop'):
@@ -218,8 +211,8 @@ with train_summary_writer.as_default():
         sum_loss_D, it_D = 0, 0
         sum_loss_G, it_G = 0, 0
         # train for an epoch
-        for x_real_with_label in dataset:
-            D_loss_dict = train_D(x_real_with_label)
+        for x_real_batch, labels_batch in zip(dataset, labels):
+            D_loss_dict = train_D(x_real_batch, labels_batch)
             sum_loss_D += float(D_loss_dict['D_loss'])
             it_D += 1
 
@@ -234,11 +227,11 @@ with train_summary_writer.as_default():
         with open(path.join(summary_dir, 'd_loss.txt'), 'a+') as file:
             file.write(str(sum_loss_D/it_D)+'\n')
 
-        x_fake = sample(random_labels_onehot, z)
+        x_fake = sample(sample_labels_onehot, z)
         img = im.immerge(x_fake, n_rows=10).squeeze()
         im.imwrite(img, py.join(sample_dir, '1', 'iter-%4d.jpg' % ep))
 
-        x_fake = sample(random_labels_onehot2, z2)
+        x_fake = sample(sample_labels_onehot, z2)
         img = im.immerge(x_fake, n_rows=10).squeeze()
         im.imwrite(img, py.join(sample_dir, '2', 'iter-%4d.jpg' % ep))
 
