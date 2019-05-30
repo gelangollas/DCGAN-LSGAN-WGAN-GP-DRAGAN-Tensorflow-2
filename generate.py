@@ -19,6 +19,7 @@ import tf2lib as tl
 
 py.arg('--experiment_folder', default='output')
 py.arg('--samples_per_class', default=5000, type=int)
+
 args = py.args()
 output_folder = Path(args.experiment_folder)
 train_args = py.load_yaml(Path(output_folder / 'settings.yml'))
@@ -91,20 +92,17 @@ try:  # restore checkpoint including the epoch counter
 except Exception as e:
     print(e)
 
-generate_summary_writer = tf.summary.create_file_writer(py.join(output_folder, 'summaries', 'generate'))
-
 results_folder = output_folder / 'generated'
 py.mkdir(results_folder)
 
 # generating samples of each class
-with generate_summary_writer.as_default():
-    for i in range(n_classes):
-        z = tf.random.normal((args.samples_per_class, 1, 1, train_args['z_dim']))
-        labels_onehot = np.zeros((args.samples_per_class, 1, 1, n_classes), dtype=np.float32)
-        labels_onehot[:, 0, 0, i] = 1
-        x_fake = sample(labels_onehot, z)
-        x_fake = np.maximum(x_fake, -1*np.ones(x_fake.shape))
-        x_fake = np.minimum(x_fake, np.ones(x_fake.shape))
-        img = im.immerge(x_fake, n_rows=1).squeeze()
-        with open(results_folder / f'class_{i}.pkl', 'wb') as file:
-            pickle.dump(x_fake, file)
+for i in range(n_classes):
+    z = tf.random.normal((args.samples_per_class, 1, 1, train_args['z_dim']))
+    labels_onehot = np.zeros((args.samples_per_class, 1, 1, n_classes), dtype=np.float32)
+    labels_onehot[:, 0, 0, i] = 1
+    x_fake = sample(labels_onehot, z)
+    x_fake = np.maximum(x_fake, -1*np.ones(x_fake.shape))
+    x_fake = np.minimum(x_fake, np.ones(x_fake.shape))
+    img = im.immerge(x_fake, n_rows=1).squeeze()
+    with open(results_folder / f'class_{i}.pkl', 'wb') as file:
+        pickle.dump(x_fake, file)
