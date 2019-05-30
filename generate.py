@@ -17,10 +17,10 @@ import tf2lib as tl
 
 # command line
 
-py.arg('--experiment_name', default='none')
-py.arg('--samples_per_class', default=10000, type=int)
+py.arg('--experiment_folder', default='output')
+py.arg('--samples_per_class', default=5000, type=int)
 args = py.args()
-output_folder = Path('output') / args.experiment_name
+output_folder = Path(args.experiment_folder)
 train_args = py.load_yaml(Path(output_folder / 'settings.yml'))
 
 
