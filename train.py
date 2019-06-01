@@ -49,7 +49,7 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
 # setup dataset
 if args.dataset in ['cifar10', 'fashion_mnist', 'mnist']:  # 32x32
-    dataset, labels, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size)
+    dataset, labels, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size, keep_percent=15)
 
     n_G_upsamplings = n_D_downsamplings = 3
     n_classes = 10

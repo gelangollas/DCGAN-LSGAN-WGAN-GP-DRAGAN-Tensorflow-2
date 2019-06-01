@@ -8,23 +8,20 @@ import random
 # =                                  datasets                                  =
 # ==============================================================================
 
-def make_32x32_dataset(dataset, batch_size, drop_remainder=True, shuffle=True, repeat=1):
+def make_32x32_dataset(dataset, batch_size, drop_remainder=True, shuffle=True, repeat=1, keep_percent=100):
     if dataset == 'mnist':
         (train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.mnist.load_data()
-        train_images = np.concatenate((train_images, test_images))
-        train_labels = np.concatenate((train_labels, test_labels))
         train_images.shape = train_images.shape + (1,)
     elif dataset == 'fashion_mnist':
         (train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.fashion_mnist.load_data()
-        train_images = np.concatenate((train_images, test_images))
-        train_labels = np.concatenate((train_labels, test_labels))
         train_images.shape = train_images.shape + (1,)
     elif dataset == 'cifar10':
         (train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.cifar10.load_data()
-        train_images = np.concatenate((train_images, test_images))
-        train_labels = np.concatenate((train_labels, test_labels))
     else:
         raise NotImplementedError
+
+    keep_index = len(train_images.shape[0]) * keep_percent // 100
+    train_images, train_labels = train_images[:keep_index], train_labels[:keep_index]
 
     @tf.function
     def _map_fn(img):
