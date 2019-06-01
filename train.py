@@ -29,6 +29,7 @@ py.arg('--adversarial_loss_mode', default='gan', choices=['gan', 'hinge_v1', 'hi
 py.arg('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wgan-gp'])
 py.arg('--gradient_penalty_weight', type=float, default=10.0)
 py.arg('--experiment_name', default='none')
+py.arg('--keep_percent', default=100, type=int)
 args = py.args()
 
 # output_dir
@@ -49,7 +50,7 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
 # setup dataset
 if args.dataset in ['cifar10', 'fashion_mnist', 'mnist']:  # 32x32
-    dataset, labels, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size, keep_percent=15)
+    dataset, labels, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size, keep_percent=args.keep_percent)
 
     n_G_upsamplings = n_D_downsamplings = 3
     n_classes = 10
