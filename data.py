@@ -20,7 +20,7 @@ def make_32x32_dataset(dataset, batch_size, drop_remainder=True, shuffle=True, r
     else:
         raise NotImplementedError
 
-    keep_index = len(train_images.shape[0]) * keep_percent // 100
+    keep_index = train_images.shape[0] * keep_percent // 100
     train_images, train_labels = train_images[:keep_index], train_labels[:keep_index]
 
     @tf.function
