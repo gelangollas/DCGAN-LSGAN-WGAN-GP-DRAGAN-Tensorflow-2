@@ -5,7 +5,7 @@ from imlib import dtype
 
 
 def imread(path, as_gray=False, **kwargs):
-    """Return a float64 image in [-1.0, 1.0]."""
+    """Возвращает float64 изображение со значениями [-1.0, 1.0]."""
     image = iio.imread(path, as_gray, **kwargs)
     if image.dtype == np.uint8:
         image = image / 127.5 - 1
@@ -19,12 +19,12 @@ def imread(path, as_gray=False, **kwargs):
 
 
 def imwrite(image, path, quality=95, **plugin_args):
-    """Save a [-1.0, 1.0] image."""
+    """Сохранить изображение со значениями [-1.0, 1.0]"""
     iio.imsave(path, dtype.im2uint(image), quality=quality, **plugin_args)
 
 
 def imshow(image):
-    """Show a [-1.0, 1.0] image."""
+    """Показать [-1.0, 1.0] изображение"""
     iio.imshow(dtype.im2uint(image))
 
 

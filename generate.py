@@ -11,25 +11,19 @@ import pylib as py
 import tf2gan as gan
 import tf2lib as tl
 
-# ==============================================================================
-# =                                   param                                    =
-# ==============================================================================
 
-# command line
+# параметры коммандной строки
 
 py.arg('--experiment_folder', default='output')
 py.arg('--samples_per_class', default=5000, type=int)
 
 args = py.args()
 output_folder = Path(args.experiment_folder)
+# загрузить описание обученной модели
 train_args = py.load_yaml(Path(output_folder / 'settings.yml'))
 
 
-# ==============================================================================
-# =                               data and model                               =
-# ==============================================================================
-
-# setup dataset
+# определение датасета. с которым работаем
 dataset = train_args['dataset']
 if dataset == 'cifar10':
     shape = (32, 32, 3)
@@ -40,17 +34,17 @@ elif dataset == 'fashion_mnist':
     n_G_upsamplings = n_D_downsamplings = 3
     n_classes = 10
 
-# setup the normalization function for discriminator
+#
+# описание и загрузка готовой модели
+#
+
+# описать функцию нормализации для дискриминатора
 if train_args['gradient_penalty_mode'] == 'none':
     d_norm = 'batch_norm'
-if train_args['gradient_penalty_mode'] in ['dragan', 'wgan-gp']:  # cannot use batch normalization with gradient penalty
-    # TODO(Lynn)
-    # Layer normalization is more stable than instance normalization here,
-    # but instance normalization works in other implementations.
-    # Please tell me if you find out the cause.
+if train_args['gradient_penalty_mode'] in ['dragan', 'wgan-gp']:
     d_norm = 'layer_norm'
 
-# networks
+# описание сетей. необходимо для корректной загрузки моделей
 output_channels = shape[-1]
 batch_size = train_args['batch_size']
 G = module.ConvGenerator(input_shape=(1, 1, train_args['z_dim']+n_classes),
@@ -64,7 +58,6 @@ D = module.ConvDiscriminator(input_shape=(shape[0], shape[1], shape[-1]+n_classe
 G.summary()
 D.summary()
 
-# adversarial_loss_functions
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(train_args['adversarial_loss_mode'])
 
 G_optimizer = keras.optimizers.Adam(learning_rate=train_args['lr'], beta_1=train_args['beta_1'])
@@ -76,10 +69,7 @@ def sample(labels_onehot, z):
     return G(tf.concat([z, labels_onehot], axis=-1), training=False)
 
 
-# epoch counter
 ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
-
-# checkpoint
 checkpoint = tl.Checkpoint(dict(G=G,
                                 D=D,
                                 G_optimizer=G_optimizer,
@@ -87,7 +77,7 @@ checkpoint = tl.Checkpoint(dict(G=G,
                                 ep_cnt=ep_cnt),
                            py.join(output_folder, 'checkpoints'),
                            max_to_keep=10)
-try:  # restore checkpoint including the epoch counter
+try:  # загрузить модели из чекпоинта
     checkpoint.restore().assert_existing_objects_matched()
 except Exception as e:
     print(e)
@@ -95,7 +85,7 @@ except Exception as e:
 results_folder = output_folder / 'generated'
 py.mkdir(results_folder)
 
-# generating samples of each class
+# генерация картинок для каждого класса
 for i in range(n_classes):
     z = tf.random.normal((args.samples_per_class, 1, 1, train_args['z_dim']))
     labels_onehot = np.zeros((args.samples_per_class, 1, 1, n_classes), dtype=np.float32)

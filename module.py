@@ -2,9 +2,9 @@ import tensorflow_addons as tfa
 import tensorflow.keras as keras
 from tensorflow.keras.layers import concatenate
 
-# ==============================================================================
-# =                                  networks                                  =
-# ==============================================================================
+#
+# описание структуры нейнронных сетей
+#
 
 def _get_norm_layer(norm):
     if norm == 'none':

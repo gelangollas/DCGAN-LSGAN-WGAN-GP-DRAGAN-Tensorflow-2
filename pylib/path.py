@@ -5,6 +5,10 @@ import glob as _glob
 import sys
 
 
+#
+# модуль для управления папками
+#
+
 def add_path(paths):
     if not isinstance(paths, (list, tuple)):
         paths = [paths]
@@ -76,7 +80,7 @@ def suffix_now(path, fmt="%Y-%m-%d-%H:%M:%S", sep='-'):
     return suffix(path, suffixes=datetime.datetime.now().strftime(fmt), sep=sep)
 
 
-def glob(dir, pats, recursive=False):  # faster than match, python3 only
+def glob(dir, pats, recursive=False):
     pats = pats if isinstance(pats, (list, tuple)) else [pats]
     matches = []
     for pat in pats:

@@ -32,7 +32,7 @@ def str2bool(v):
 
 
 def argument(*args, **kwargs):
-    """Wrap argparse.add_argument."""
+    """Обертка для argparse.add_argument."""
     if 'type'in kwargs:
         if issubclass(kwargs['type'], bool):
             kwargs['type'] = str2bool
@@ -46,31 +46,9 @@ arg = argument
 
 @_serialization_wrapper
 def args(args=None, namespace=None):
-    """Parse args using the global parser."""
+    """Парсинг аргументов"""
     namespace = GLOBAL_COMMAND_PARSER.parse_args(args=args, namespace=namespace)
     return namespace
-
-
-@_serialization_wrapper
-def args_from_xxx(obj, parser, check=True):
-    """Load args from xxx ignoring type and choices with default still valid.
-
-    Parameters
-    ----------
-    parser: function
-        Should return a dict.
-
-    """
-    dict_ = parser(obj)
-    namespace = argparse.ArgumentParser().parse_args(args='')  # '' for not to accept command line args
-    for k, v in dict_.items():
-        namespace.__setattr__(k, v)
-    return namespace
-
-
-args_from_dict = functools.partial(args_from_xxx, parser=lambda x: x)
-args_from_json = functools.partial(args_from_xxx, parser=serialization.load_json)
-args_from_yaml = functools.partial(args_from_xxx, parser=serialization.load_yaml)
 
 
 def args_to_json(path, namespace, **kwagrs):

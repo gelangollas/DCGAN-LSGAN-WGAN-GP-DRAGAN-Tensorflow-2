@@ -1,6 +1,11 @@
 import tensorflow as tf
 
 
+#
+# функции потерь для нейронных сетей
+#
+
+
 def get_gan_losses_fn():
     bce = tf.losses.BinaryCrossentropy(from_logits=True)
 
@@ -70,6 +75,7 @@ def get_wgan_losses_fn():
     return d_loss_fn, g_loss_fn
 
 
+
 def get_adversarial_losses_fn(mode):
     if mode == 'gan':
         return get_gan_losses_fn()
@@ -83,10 +89,11 @@ def get_adversarial_losses_fn(mode):
         return get_wgan_losses_fn()
 
 
+# функция для подсчета градиентного штрафа
 def gradient_penalty(f, real, fake, mode):
     def _gradient_penalty(f, real, fake=None):
         def _interpolate(a, b=None):
-            if b is None:   # interpolation in DRAGAN
+            if b is None:   # интерполяция в DRAGAN
                 beta = tf.random.uniform(shape=tf.shape(a), minval=0., maxval=1.)
                 b = a + 0.5 * tf.math.reduce_std(a) * beta
             shape = [tf.shape(a)[0]] + [1] * (a.shape.ndims - 1)

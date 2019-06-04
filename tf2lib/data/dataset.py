@@ -3,6 +3,7 @@ import multiprocessing
 import tensorflow as tf
 
 
+# генерация батч-датасета с препроцессингом
 def batch_dataset(dataset,
                   batch_size,
                   drop_remainder=True,

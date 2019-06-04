@@ -11,12 +11,12 @@ imrescale = transform.rescale
 
 
 def immerge(images, n_rows=None, n_cols=None, padding=0, pad_value=0):
-    """Merge images to an image with (n_rows * h) * (n_cols * w).
+    """Склеивает изображение из картинок (n_rows * h) * (n_cols * w).
 
-    Parameters
+    Параметры
     ----------
-    images : numpy.array or object which can be converted to numpy.array
-        Images in shape of N * H * W(* C=1 or 3).
+    images : numpy.array или объект, который может быть сконвертирован в numpy.array
+        Изображения с параметрами N * H * W(* C=1 или 3).
 
     """
     images = np.array(images)

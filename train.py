@@ -13,17 +13,13 @@ import pylib as py
 import tf2gan as gan
 import tf2lib as tl
 
-# ==============================================================================
-# =                                   param                                    =
-# ==============================================================================
-
-# command line
+# параметры комманной строки
 py.arg('--dataset', default='fashion_mnist', choices=['cifar10', 'fashion_mnist', 'mnist', 'celeba', 'anime', 'custom'])
 py.arg('--batch_size', type=int, default=64)
 py.arg('--epochs', type=int, default=25)
 py.arg('--lr', type=float, default=0.0002)
 py.arg('--beta_1', type=float, default=0.5)
-py.arg('--n_d', type=int, default=1)  # # d updates per g update
+py.arg('--n_d', type=int, default=1)  # сколько раз тренируется D на одну тренировку G
 py.arg('--z_dim', type=int, default=128)
 py.arg('--adversarial_loss_mode', default='gan', choices=['gan', 'hinge_v1', 'hinge_v2', 'lsgan', 'wgan'])
 py.arg('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wgan-gp'])
@@ -32,7 +28,7 @@ py.arg('--experiment_name', default='none')
 py.arg('--keep_percent', default=100, type=int)
 args = py.args()
 
-# output_dir
+# папка с результатами
 if args.experiment_name == 'none':
     args.experiment_name = '%s_%s' % (args.dataset, args.adversarial_loss_mode)
     if args.gradient_penalty_mode != 'none':
@@ -40,53 +36,29 @@ if args.experiment_name == 'none':
 output_dir = py.join('output', args.experiment_name)
 py.mkdir(output_dir)
 
-# save settings
+# сохранение метаданных запуска
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
 
-# ==============================================================================
-# =                               data and model                               =
-# ==============================================================================
+#
+# данные и модель
+#
 
-# setup dataset
-if args.dataset in ['cifar10', 'fashion_mnist', 'mnist']:  # 32x32
-    dataset, labels, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size, keep_percent=args.keep_percent)
 
-    n_G_upsamplings = n_D_downsamplings = 3
-    n_classes = 10
+# загрузка данных
+dataset, labels, shape, len_dataset = data.make_32x32_dataset(args.dataset, args.batch_size, keep_percent=args.keep_percent)
 
-elif args.dataset == 'celeba':  # 64x64
-    img_paths = py.glob('data/img_align_celeba', '*.jpg')
-    dataset, shape, len_dataset = data.make_celeba_dataset(img_paths, args.batch_size)
-    n_G_upsamplings = n_D_downsamplings = 4
+n_G_upsamplings = n_D_downsamplings = 3
+n_classes = 10
 
-elif args.dataset == 'anime':  # 64x64
-    img_paths = py.glob('data/faces', '*.jpg')
-    dataset, shape, len_dataset = data.make_anime_dataset(img_paths, args.batch_size)
-    n_G_upsamplings = n_D_downsamplings = 4
 
-elif args.dataset == 'custom':
-    # ======================================
-    # =               custom               =
-    # ======================================
-    img_paths = ...  # image paths of custom dataset
-    dataset, shape, len_dataset = data.make_custom_dataset(img_paths, args.batch_size)
-    n_G_upsamplings = n_D_downsamplings = ...  # 3 for 32x32 and 4 for 64x64
-    # ======================================
-    # =               custom               =
-    # ======================================
-
-# setup the normalization function for discriminator
+# настройка функции нормализации для D
 if args.gradient_penalty_mode == 'none':
     d_norm = 'batch_norm'
-if args.gradient_penalty_mode in ['dragan', 'wgan-gp']:  # cannot use batch normalization with gradient penalty
-    # TODO(Lynn)
-    # Layer normalization is more stable than instance normalization here,
-    # but instance normalization works in other implementations.
-    # Please tell me if you find out the cause.
+if args.gradient_penalty_mode in ['dragan', 'wgan-gp']:  # нельзя использовать батч нормализацию с градиентным штрафом
     d_norm = 'layer_norm'
 
-# networks
+# нейронные сети
 output_channels = shape[-1]
 batch_size = args.batch_size
 G = module.ConvGenerator(input_shape=(1, 1, args.z_dim+n_classes),
@@ -100,16 +72,16 @@ D = module.ConvDiscriminator(input_shape=(shape[0], shape[1], shape[-1]+n_classe
 G.summary()
 D.summary()
 
-# adversarial_loss_functions
+# функции потерь
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 
 G_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1)
 D_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1)
 
 
-# ==============================================================================
-# =                                 train step                                 =
-# ==============================================================================
+#
+# функции обучения моделей
+#
 
 @tf.function
 def train_G():
@@ -164,14 +136,14 @@ def sample(labels_onehot, z):
     return G(tf.concat([z, labels_onehot], axis=-1), training=False)
 
 
-# ==============================================================================
-# =                                    run                                     =
-# ==============================================================================
+#
+# этап обучения моделей
+#
 
-# epoch counter
+# счетчик эпох
 ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
-# checkpoint
+# чекпоинт для сохранения прогресса обучения
 checkpoint = tl.Checkpoint(dict(G=G,
                                 D=D,
                                 G_optimizer=G_optimizer,
@@ -179,37 +151,37 @@ checkpoint = tl.Checkpoint(dict(G=G,
                                 ep_cnt=ep_cnt),
                            py.join(output_dir, 'checkpoints'),
                            max_to_keep=10)
-try:  # restore checkpoint including the epoch counter
+try:  # восстановление чекпоинта
     checkpoint.restore().assert_existing_objects_matched()
 except Exception as e:
     print(e)
 
-# summary
+# объект для логирования
 train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summaries', 'train'))
 
-# sample
+# папки для сохранения примеров G
 sample_dir = py.join(output_dir, 'samples_training')
 summary_dir = path.join(output_dir, 'summaries')
 py.mkdir(py.join(sample_dir, '1'))
 py.mkdir(py.join(sample_dir, '2'))
 
-# main loop
-z = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))  # a fixed noise for sampling
-z2 = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))  # a fixed noise for sampling
+
+z = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))  # рандомный шум для генерации изображений
+z2 = tf.random.normal((n_classes*n_classes, 1, 1, args.z_dim))
 sample_labels = np.array(list(range(n_classes))*n_classes).reshape((n_classes*n_classes, 1, 1))
 sample_labels_onehot = tf.one_hot(sample_labels, depth=n_classes, dtype=tf.dtypes.float32)
 
+# основной цикл
 with train_summary_writer.as_default():
     for ep in tqdm.trange(args.epochs, desc='Epoch Loop'):
         if ep < ep_cnt:
             continue
 
-        # update epoch counter
         ep_cnt.assign_add(1)
 
         sum_loss_D, it_D = 0, 0
         sum_loss_G, it_G = 0, 0
-        # train for an epoch
+        # обучение одной эпохи
         for x_real_batch, labels_batch in zip(dataset, labels):
             D_loss_dict = train_D(x_real_batch, labels_batch)
             sum_loss_D += float(D_loss_dict['D_loss'])
@@ -234,5 +206,4 @@ with train_summary_writer.as_default():
         img = im.immerge(x_fake, n_rows=10).squeeze()
         im.imwrite(img, py.join(sample_dir, '2', 'iter-%4d.jpg' % ep))
 
-        # save checkpoint
         checkpoint.save(ep)
