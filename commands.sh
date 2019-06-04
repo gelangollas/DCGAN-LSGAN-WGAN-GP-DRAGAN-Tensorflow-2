@@ -24,3 +24,10 @@ python train.py --dataset=cifar10 --epoch=100 --adversarial_loss_mode=gan --grad
 python train.py --dataset=cifar10 --epoch=100 --adversarial_loss_mode=lsgan --kep_percent=10
 # WGAN
 python train.py --dataset=cifar10 --epoch=100 --adversarial_loss_mode=wgan --gradient_penalty_mode=wgan-gp --n_d=5 --kep_percent=10
+
+
+#
+# Генерация картинок обученной моделью
+#
+
+python generate.py --experiment_folder=output/fashion-dcgan-small-data --samples_per_class=100
